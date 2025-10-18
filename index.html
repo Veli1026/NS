@@ -1,0 +1,1278 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+    <title>İyi ki Doğdun Nesibe!</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Pacifico&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        html, body { height: 100%; overflow: hidden; }
+        body { font-family: 'Inter', sans-serif; touch-action: manipulation; overscroll-behavior: none; background-color: #fdf2f8; color: #334155; }
+        h1 { font-family: 'Pacifico', cursive; }
+        #game-container { -webkit-user-select: none; user-select: none; }
+        canvas { border-radius: 0.75rem; box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1); cursor: pointer; position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        .overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; border-radius: 0.75rem; color: white; text-shadow: 2px 2px 4px rgba(0,0,0,0.6); padding: 1rem; }
+        .special-message { animation: slide-in-out 5s ease-in-out forwards; }
+        @keyframes slide-in-out {
+            0% { transform: translateY(-150%); opacity: 0; }
+            20%, 80% { transform: translateY(0); opacity: 1; }
+            100% { transform: translateY(-150%); opacity: 0; }
+        }
+        #powerup-timer-bar { transition: width 0.1s linear; }
+        #game-wrapper { width: 100%; }
+        #game-container { width: 100%; aspect-ratio: 2 / 3; }
+        #game-container.show-how-to-play #menu-background-canvas,
+        #game-container.show-how-to-play #game-canvas,
+        #game-container.show-stats #menu-background-canvas { filter: blur(5px); }
+        #menu-background-canvas, #game-canvas { filter: none; transition: filter 0.5s ease-out, opacity 0.6s ease-out, transform 0.6s ease-out; }
+        #game-canvas.fade-out { opacity: 0; transform: scale(0.95); }
+        #how-to-play-screen, #stats-screen { opacity: 0; transform: scale(0.95); pointer-events: none; transition: opacity 0.4s ease-out, transform 0.4s ease-out; }
+        #how-to-play-screen.active, #stats-screen.active { opacity: 1; transform: scale(1); pointer-events: auto; }
+        #start-screen { transition: opacity 0.4s ease-out, transform 0.4s ease-out; pointer-events: auto; }
+        #start-screen.fade-out { opacity: 0; transform: scale(0.95); pointer-events: none; }
+        #pause-screen { opacity: 0; transform: scale(0.95); pointer-events: none; transition: opacity 0.6s ease-out, transform 0.6s ease-out; background-color: rgba(0, 0, 0, 0.8); z-index: 60; }
+        #pause-screen.active { opacity: 1; transform: scale(1); pointer-events: auto; }
+        #countdown-screen { background-color: rgba(0, 0, 0, 0.3); z-index: 70; opacity: 0; transition: opacity 0.2s ease-out; }
+        #countdown-screen.active { opacity: 1; }
+        #countdown-display { text-shadow: 4px 4px 8px rgba(0,0,0,0.8); animation: pulse 1s infinite; }
+        @keyframes pulse { 0% { transform: scale(0.9); } 50% { transform: scale(1.1); } 100% { transform: scale(0.9); } }
+        .achievement-item.locked { opacity: 0.5; }
+        #achievement-toast.show { transform: translate(-50%, 0); opacity: 1; }
+        .progress-bar { background-color: rgba(255,255,255,0.2); border-radius: 999px; height: 8px; width: 100%; margin-top: 4px; }
+        .progress-bar-inner { background-color: #f472b6; border-radius: 999px; height: 100%; transition: width 0.5s ease-out; }
+        @keyframes score-pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.25); color: #ec4899; }
+            100% { transform: scale(1); }
+        }
+        .score-pulse-anim { display: inline-block; animation: score-pulse 0.3s ease-in-out; }
+        @keyframes shake-sharp {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-6px); }
+            50% { transform: translateX(6px); }
+            75% { transform: translateX(-6px); }
+        }
+        .shake-anim { animation: shake-sharp 0.15s linear; }
+        .life-heart { display: inline-block; transition: transform 0.3s; margin: 0 2px; }
+        @keyframes life-fade-in {
+            from { opacity: 0; transform: scale(0.5); }
+            to { opacity: 1; transform: scale(1.2); }
+        }
+        .life-fade-in { animation: life-fade-in 0.4s ease-out forwards; }
+        @keyframes life-fade-out {
+            from { opacity: 1; transform: scale(1); }
+            to { opacity: 0; transform: scale(0.5); }
+        }
+        .life-fade-out { animation: life-fade-out 0.4s ease-in forwards; }
+        @keyframes signature-fade {
+            0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
+            10%  { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            90%  { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
+        }
+        .signature-show { display: block !important; animation: signature-fade 3s ease-in-out; }
+        @keyframes rotate-phone {
+            0% { transform: rotate(0deg); }
+            25% { transform: rotate(0deg); }
+            50% { transform: rotate(90deg); }
+            75% { transform: rotate(90deg); }
+            100% { transform: rotate(0deg); }
+        }
+        .rotate-phone-anim { animation: rotate-phone 2.5s infinite ease-in-out; }
+    </style>
+</head>
+<body class="flex items-center justify-center p-2 sm:p-4">
+
+    <div id="orientation-warning" class="fixed inset-0 bg-pink-500 flex flex-col items-center justify-center text-white text-center p-4 z-[200] hidden">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mb-4 rotate-phone-anim" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+        </svg>
+        <h2 class="text-2xl font-bold mb-2">Lütfen Cihazınızı Döndürün</h2>
+        <p>Bu oyun en iyi dikey modda oynanır.</p>
+        <button id="continue-landscape-button" class="mt-6 bg-white/20 hover:bg-white/30 text-white font-bold py-2 px-6 rounded-full text-sm transition duration-300">
+            Yatay Modda Devam Et
+        </button>
+    </div>
+
+    <div id="main-content" class="w-full h-full flex items-center justify-center">
+        <main class="w-full max-w-md mx-auto flex flex-col">
+            <h1 id="main-title" class="text-3xl sm:text-4xl md:text-5xl text-pink-500 mb-1 text-center cursor-pointer">İyi ki Doğdun Nesibe!</h1>
+            <p id="subtitle" class="text-sm sm:text-base text-slate-600 mb-2 sm:mb-3 text-center">Pastaları yakala, sebzelerden kaç!</p>
+
+            <div class="flex items-center justify-between w-full mx-auto mb-2 sm:mb-3 font-bold">
+                <div class="flex items-center space-x-2 flex-1">
+                    <div class="bg-white rounded-lg shadow-md px-3 py-2 text-slate-700 text-center text-xs sm:text-sm md:text-base flex-1">Skor: <span id="score-display">0</span></div>
+                    <div id="level-display" class="bg-white rounded-lg shadow-md px-3 py-2 text-purple-600 text-center text-xs sm:text-sm md:text-base flex-1">Seviye: 1</div>
+                    <div id="lives-display" class="bg-white rounded-lg shadow-md px-3 py-2 text-red-500 text-center text-xs sm:text-sm md:text-base flex-1 flex items-center justify-center"></div>
+                </div>
+                <div class="flex items-center space-x-2 ml-4">
+                    <button id="mute-button" class="bg-white rounded-full shadow-md p-2 md:p-3 text-lg sm:text-xl md:text-2xl flex items-center justify-center">🔊</button>
+                    <button id="pause-button" class="bg-white rounded-full shadow-md p-2 md:p-3 text-lg sm:text-xl md:text-2xl flex items-center justify-center hidden">⏸️</button>
+                </div>
+            </div>
+            
+            <div id="game-wrapper">
+                <div id="game-container" class="relative mx-auto">
+                    <canvas id="game-canvas"></canvas>
+                    
+                    <div id="start-screen" class="overlay bg-transparent z-50 justify-center">
+                        <canvas id="menu-background-canvas" class="-z-10"></canvas>
+                        <div id="start-screen-content" class="flex flex-col space-y-4 items-center">
+                            <p id="high-score-display" class="text-xl sm:text-2xl font-bold text-slate-700 bg-white/20 backdrop-blur-md px-4 py-2 rounded-lg shadow-md mb-12 sm:mb-20 cursor-pointer">En Yüksek Skor: 0</p>
+                            <button id="start-button" class="bg-pink-500/30 hover:bg-pink-500/50 backdrop-blur-md border border-white/30 text-white font-black py-3 px-8 sm:px-10 rounded-full text-lg sm:text-2xl transition duration-300 transform hover:scale-105">Oyuna Başla</button>
+                            <button id="how-to-play-button" class="bg-purple-500/30 hover:bg-purple-500/50 backdrop-blur-md border border-white/30 text-white font-bold py-2 sm:py-3 px-8 sm:px-10 rounded-full text-base sm:text-xl transition duration-300">Nasıl Oynanır?</button>
+                            <button id="stats-button" class="bg-teal-500/30 hover:bg-teal-500/50 backdrop-blur-md border border-white/30 text-white font-bold py-2 sm:py-3 px-8 sm:px-10 rounded-full text-base sm:text-xl transition duration-300">Başarımlar & İstatistikler</button>
+                        </div>
+                    </div>
+
+                    <div id="how-to-play-screen" class="overlay bg-black bg-opacity-80 z-50 text-left text-sm sm:text-lg p-4 sm:p-6 justify-between">
+                        <h2 class="text-2xl sm:text-3xl font-bold text-center text-yellow-300 flex-shrink-0">Nasıl Oynanır?</h2>
+                        <div class="space-y-2 sm:space-y-4 overflow-y-auto my-4 flex-grow">
+                            <p><strong>Amaç:</strong> En yüksek puanı topla! Pastaları yakala, sebzelerden kaç.</p>
+                            <p><strong>Kontroller:</strong> Sepeti hareket ettirmek için parmağını ekran üzerinde sürükle veya klavyedeki ok tuşlarını kullan.</p>
+                            <p><strong>Canlar:</strong> 3 canla ❤️ başlarsın. Bir sebzeye çarptığında bir can kaybedersin. Dikkatli ol!</p>
+                            <p><strong>Ekstra Can:</strong> Her <strong>1000 puanda bir</strong> ekstra can kazanırsın. Gözünü skordan ayırma!</p>
+                            <p><strong>Özel Objeler:</strong></p>
+                            <ul class="list-disc list-inside ml-4 space-y-2">
+                                <li><strong>Hediye Paketi:</strong> Zamanı 5 saniyeliğine yavaşlatır.</li>
+                                <li><strong>Büyülü Kapkek:</strong> Çok nadirdir! Yakalarsan tam 50 puan verir ve büyük bir konfeti patlaması yaratır.</li>
+                            </ul>
+                        </div>
+                        <button id="back-button" class="bg-gray-500/30 hover:bg-gray-500/50 backdrop-blur-md border border-white/30 text-white font-bold py-2 px-8 rounded-full text-base sm:text-lg transition duration-300 flex-shrink-0">Geri Dön</button>
+                    </div>
+
+                    <div id="stats-screen" class="overlay bg-black bg-opacity-80 z-50 text-left text-sm sm:text-lg p-4 sm:p-6 justify-between">
+                        <h2 class="text-2xl sm:text-3xl font-bold text-center text-yellow-300 flex-shrink-0">Başarımlar & İstatistikler</h2>
+                        <div class="w-full max-w-sm flex-grow overflow-y-auto my-4 min-h-0 pr-2">
+                            <h3 class="font-bold text-lg sm:text-xl text-pink-300 mb-2">İstatistikler</h3>
+                            <div id="stats-list" class="grid grid-cols-2 gap-x-4 gap-y-2 bg-white/10 p-3 rounded-lg mb-4"></div>
+                            <h3 class="font-bold text-lg sm:text-xl text-pink-300 mb-2">Başarımlar</h3>
+                            <div id="achievements-list" class="space-y-3"></div>
+                        </div>
+                        <button id="stats-back-button" class="bg-gray-500/30 hover:bg-gray-500/50 backdrop-blur-md border border-white/30 text-white font-bold py-2 px-8 rounded-full text-base sm:text-lg transition duration-300 flex-shrink-0">Geri Dön</button>
+                    </div>
+
+                    <div id="pause-screen" class="overlay hidden justify-center">
+                        <h2 class="text-3xl sm:text-4xl font-black text-yellow-300 mb-6">Oyun Duraklatıldı</h2>
+                        <div class="flex flex-col space-y-4">
+                            <button id="continue-button" class="bg-blue-500/30 hover:bg-blue-500/50 backdrop-blur-md border border-white/30 text-white font-bold py-3 px-10 rounded-full text-lg sm:text-2xl transition duration-300 transform hover:scale-105">Devam Et</button>
+                            <button id="main-menu-button" class="bg-red-500/30 hover:bg-red-500/50 backdrop-blur-md border border-white/30 text-white font-bold py-3 px-10 rounded-full text-base sm:text-xl transition duration-300">Ana Menü</button>
+                        </div>
+                    </div>
+
+                    <div id="countdown-screen" class="overlay hidden justify-center">
+                        <span id="countdown-display" class="text-white text-9xl font-black">3</span>
+                    </div>
+
+                    <div id="game-over-screen" class="overlay hidden bg-black bg-opacity-60 z-40 p-4 text-center overflow-hidden justify-center">
+                        <div id="screenshot-bg" class="hidden absolute inset-0 -z-10 bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600"></div>
+                        <img id="game-over-avatar" src="https://placehold.co/100x100/f472b6/ffffff?text=Nesibe" class="rounded-full border-4 border-white bg-pink-300 shadow-lg mb-3 w-20 h-20 sm:w-24 sm:h-24 cursor-pointer" alt="Doğum Günü Kızı">
+                        <h2 id="game-over-title" class="text-3xl sm:text-4xl font-black text-yellow-300 mb-2">Oyun Bitti!</h2>
+                        <p class="text-lg sm:text-xl mb-2">Final Skorun: <span id="final-score" class="font-bold">0</span></p>
+                        <p id="new-high-score-message" class="hidden text-xl sm:text-2xl font-bold text-yellow-300 mb-4 animate-pulse">Yeni Yüksek Skor!</p>
+                        <div class="grid grid-cols-3 gap-2 text-center text-xs sm:text-sm mb-4 bg-white bg-opacity-10 p-2 rounded-lg">
+                            <div>🎂<br><span id="cakes-caught">0</span><br>Pasta</div>
+                            <div>🥦<br><span id="veggies-avoided">0</span><br>Kaçış</div>
+                            <div>🏆<br><span id="max-level">0</span><br>Seviye</div>
+                        </div>
+                        <div class="flex flex-col space-y-2 w-full px-4 max-w-xs text-sm sm:text-lg">
+                             <button id="restart-button" class="w-full bg-blue-500/30 hover:bg-blue-500/50 backdrop-blur-md border border-white/30 text-white font-bold py-2 sm:py-3 px-6 rounded-full transition duration-300">Yeniden Oyna</button>
+                             <button id="game-over-main-menu-button" class="w-full bg-red-500/30 hover:bg-red-500/50 backdrop-blur-md border border-white/30 text-white font-bold py-2 sm:py-3 px-6 rounded-full transition duration-300">Ana Menü</button>
+                             <button id="share-button" class="w-full bg-green-500/30 hover:bg-green-500/50 backdrop-blur-md border border-white/30 text-white font-bold py-2 sm:py-3 px-6 rounded-full transition duration-300">Sonucu Paylaş</button>
+                        </div>
+                    </div>
+                    <div id="special-message-container" class="absolute top-6 left-0 w-full flex justify-center z-10 pointer-events-none">
+                         <div id="special-message" class="hidden bg-pink-500 text-white p-2 px-4 rounded-full shadow-lg text-sm sm:text-md font-bold"></div>
+                    </div>
+                    <div id="powerup-timer-container" class="absolute top-2 left-1/2 -translate-x-1/2 w-1/2 p-1 hidden">
+                        <div class="w-full bg-gray-200 rounded-full h-2.5">
+                            <div id="powerup-timer-bar" class="bg-yellow-400 h-2.5 rounded-full" style="width: 100%"></div>
+                        </div>
+                    </div>
+                     <div id="achievement-toast" class="absolute top-4 left-1/2 -translate-x-1/2 w-11/12 max-w-sm p-3 rounded-lg bg-black/40 backdrop-blur-sm text-white shadow-2xl flex items-center transform transition-all duration-500 ease-out opacity-0 -translate-y-24 pointer-events-none z-50">
+                        <span id="achievement-icon" class="text-4xl mr-4"></span>
+                        <div>
+                            <h4 id="achievement-title" class="font-black"></h4>
+                            <p id="achievement-desc" class="text-sm text-gray-200"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="easter-egg-signature" class="hidden fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black/70 text-white px-4 py-2 rounded-lg text-lg font-bold z-[100]">Created by TheMVT™</div>
+        </main>
+    </div>
+
+<script>
+    const isTouchDevice = () => 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+    document.addEventListener('DOMContentLoaded', () => {
+
+    const canvas = document.getElementById('game-canvas');
+    const ctx = canvas.getContext('2d');
+    const menuCanvas = document.getElementById('menu-background-canvas');
+    const menuCtx = menuCanvas.getContext('2d');
+    
+    const assetUrls = {
+        player: 'https://i.ibb.co/MxPPfhgg/basket-1f9fa.png',
+        cake: 'https://i.ibb.co/6JWH6wbq/birthday-cake-1f382.png',
+        sliceCake: 'https://i.ibb.co/PsX7TjPs/shortcake-1f370.png',
+        cupcake: 'https://i.ibb.co/chHZtCzC/cupcake-1f9c1.png',
+        gift: 'https://i.ibb.co/VpM85M9L/wrapped-gift-1f381.png',
+        goldenCupcake: 'https://i.ibb.co/chHZtCzC/cupcake-1f9c1.png',
+        broccoli: 'https://i.ibb.co/TxJJdrQm/broccoli-1f966.png',
+        carrot: 'https://i.ibb.co/Y41MT5P5/carrot-1f955.png',
+        balloon: 'https://i.ibb.co/CsMXfmBZ/balloon-1f388.png',
+        popper: 'https://i.ibb.co/20f1DZdW/party-popper-1f389.png',
+        sparkles: 'https://i.ibb.co/4w8gwCRZ/sparkles-2728.png'
+    };
+
+    const assets = {};
+
+    function loadAssets() {
+        const promises = Object.entries(assetUrls).map(([id, url]) => {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.crossOrigin = "Anonymous"; 
+                img.onload = () => {
+                    assets[id] = img;
+                    resolve();
+                };
+                img.onerror = () => {
+                    console.error(`Resim yüklenemedi: ${id} - ${url}`);
+                    reject(new Error(`Resim yüklenemedi: ${id}`));
+                };
+                img.src = url;
+            });
+        });
+        return Promise.all(promises);
+    }
+
+    let forceLandscapeAllowed = false;
+
+    const dom = {
+        mainTitle: document.getElementById('main-title'),
+        signature: document.getElementById('easter-egg-signature'),
+        cakesCaught: document.getElementById('cakes-caught'),
+        veggiesAvoided: document.getElementById('veggies-avoided'),
+        maxLevel: document.getElementById('max-level'),
+        container: document.getElementById('game-container'),
+        scoreDisplay: document.getElementById('score-display'),
+        levelDisplay: document.getElementById('level-display'),
+        livesDisplay: document.getElementById('lives-display'),
+        muteButton: document.getElementById('mute-button'),
+        pauseButton: document.getElementById('pause-button'),
+        startScreen: document.getElementById('start-screen'),
+        startScreenContent: document.getElementById('start-screen-content'),
+        startButton: document.getElementById('start-button'),
+        howToPlayButton: document.getElementById('how-to-play-button'),
+        howToPlayScreen: document.getElementById('how-to-play-screen'),
+        backButton: document.getElementById('back-button'),
+        pauseScreen: document.getElementById('pause-screen'),
+        continueButton: document.getElementById('continue-button'),
+        mainMenuButton: document.getElementById('main-menu-button'),
+        countdownScreen: document.getElementById('countdown-screen'),
+        countdownDisplay: document.getElementById('countdown-display'),
+        gameOverScreen: document.getElementById('game-over-screen'),
+        finalScore: document.getElementById('final-score'),
+        restartButton: document.getElementById('restart-button'),
+        shareButton: document.getElementById('share-button'),
+        specialMessage: document.getElementById('special-message'),
+        powerUpTimerContainer: document.getElementById('powerup-timer-container'),
+        powerUpTimerBar: document.getElementById('powerup-timer-bar'),
+        gameCanvas: canvas,
+        gameOverMainMenuButton: document.getElementById('game-over-main-menu-button'),
+        highScoreDisplay: document.getElementById('high-score-display'),
+        newHighScoreMessage: document.getElementById('new-high-score-message'),
+        statsButton: document.getElementById('stats-button'),
+        statsScreen: document.getElementById('stats-screen'),
+        statsBackButton: document.getElementById('stats-back-button'),
+        statsList: document.getElementById('stats-list'),
+        achievementsList: document.getElementById('achievements-list'),
+        achievementToast: document.getElementById('achievement-toast'),
+        achievementIcon: document.getElementById('achievement-icon'),
+        achievementTitle: document.getElementById('achievement-title'),
+        achievementDesc: document.getElementById('achievement-desc'),
+        gameOverAvatar: document.getElementById('game-over-avatar'),
+        gameOverTitle: document.getElementById('game-over-title'),
+        orientationWarning: document.getElementById('orientation-warning'),
+        continueLandscapeButton: document.getElementById('continue-landscape-button'),
+        mainContent: document.getElementById('main-content'),
+    };
+
+    let state; 
+    let menuAnimationId;
+    let menuParticles = [];
+    let menuThemeState = { currentIndex: 0, transitionProgress: 0, transitionDuration: 300, nextTransitionFrame: 600 };
+    let savedData; 
+
+    const config = {
+        player: { width: 60, height: 50, speed: 8, assetId: 'player' },
+        baseSpeed: 1.5,
+        speedIncrement: 0.3,
+        levelUpBaseScore: 100,
+        levelUpIncrement: 50,
+        powerUpDuration: 5000,
+        initialLives: 3,
+        invincibilityDuration: 120,
+        themes: [
+            { id: 'default', name: 'Gündüz', start: '#a2d2ff', end: '#bde0fe' },
+            { id: 'purple', name: 'Mor Gece', start: '#480ca8', end: '#7209b7'},
+            { id: 'dark', name: 'Derin Mavi', start: '#03045e', end: '#023e8a'}
+        ],
+        themeChangeLevel: 2,
+        objectTypes: {
+            positive: [ 
+                { assetId: 'cake', points: 15 }, 
+                { assetId: 'sliceCake', points: 10 }, 
+                { assetId: 'cupcake', points: 5 } 
+            ],
+            powerUp: { assetId: 'gift', points: 15, powerUp: true },
+            golden: { assetId: 'goldenCupcake', points: 50, isGolden: true },
+            negative: [ 
+                { assetId: 'broccoli', points: -1 }, 
+                { assetId: 'carrot', points: -1 } 
+            ],
+        },
+        negativeItemChance: 0.45,
+        powerUpChance: 0.05,
+        goldenCupcakeChance: 0.03,
+        messages: ["İyi ki Doğdun!", "Nice mutlu yıllara!", "Harika gidiyorsun!", "Pastaları kaçırma!"],
+        balloonAssetIds: ['balloon', 'popper', 'sparkles'],
+        menuAssetIds: ['cake', 'sliceCake', 'cupcake', 'gift', 'balloon', 'popper', 'sparkles'],
+        achievements: {
+            score1000: { id: 'score1000', title: 'Binlik Klübü', description: 'Tek oyunda 1000 puana ulaş', condition: (st) => st.score >= 1000, icon: '🎯', progress: (st, sd) => ({ current: st.score, target: 1000 }) },
+            totalScore20000: { id: 'totalScore20000', title: 'Skor Canavarı', description: 'Toplamda 20000 puana ulaş', condition: (st, sd) => sd.totalScore >= 20000, icon: '👾', progress: (st, sd) => ({ current: sd.totalScore, target: 20000 }) },
+            superstar: { id: 'superstar', title: 'Süperstar!', description: 'Tek oyunda 2500 puana ulaş', condition: (st) => st.score >= 2500, icon: '✨', progress: (st, sd) => ({ current: st.score, target: 2500 }) },
+            level10: { id: 'level10', title: 'Alev Aldı!', description: '10. seviyeye ulaş', condition: (st) => st.level >= 10, icon: '🔥', progress: (st, sd) => ({ current: st.level, target: 10 }) },
+            flawlessStart: { id: 'flawlessStart', title: 'Kusursuz Başlangıç', description: '250 puana hiç can kaybetmeden ulaş', condition: (st) => st.score >= 250 && st.stats.veggiesHit === 0, icon: '💯' },
+            heartCollector: { id: 'heartCollector', title: 'Kalp Koleksiyoncusu', description: 'Aynı anda 5 cana sahip ol', condition: (st) => st.lives >= 5, icon: '❤️' },
+            giftHoarder: { id: 'giftHoarder', title: 'Hediye Yağmuru', description: 'Toplam 25 hediye paketi topla', condition: (st, sd) => sd.totalGiftsCollected >= 25, icon: '🎁', progress: (st, sd) => ({ current: sd.totalGiftsCollected, target: 25 }) },
+            veggieLover: { id: 'veggieLover', title: 'Sağlıklı Beslenme?', description: 'Toplam 50 sebzeye çarp', condition: (st, sd) => sd.totalVeggiesHit >= 50, icon: '🥦', progress: (st, sd) => ({ current: sd.totalVeggiesHit, target: 50 }) },
+        }
+    };
+
+    function loadGameData() {
+        const dataString = localStorage.getItem('birthdayGameSaveData');
+        let data = { 
+            highScore: 0, 
+            gamesPlayed: 0, 
+            unlockedAchievements: [], 
+            totalScore: 0, 
+            totalCakesCaught: 0, 
+            totalVeggiesHit: 0,
+            totalGiftsCollected: 0,
+        };
+        if (dataString) {
+            try {
+                const parsedData = JSON.parse(dataString);
+                data = { ...data, ...parsedData };
+            } catch (error) { console.error("Error reading saved data:", error); }
+        }
+        if (data.unlockedAchievements) {
+            data.unlockedAchievements.forEach(id => {
+                if (config.achievements[id]) config.achievements[id].unlocked = true;
+            });
+        }
+        return data;
+    }
+
+    function saveGameData() {
+        savedData.unlockedAchievements = Object.values(config.achievements).filter(ach => ach.unlocked).map(ach => ach.id);
+        try {
+            localStorage.setItem('birthdayGameSaveData', JSON.stringify(savedData));
+        } catch (error) { console.error("Error saving data:", error); }
+    }
+
+    let musicSynth, music, sfxSynth, extraLifeSfx, errorSfxSynth, isMuted = false, lastSfxTime = 0, extraLifeGrantedThisFrame = false;
+
+    function setupAudio() {
+        if (!musicSynth) musicSynth = new Tone.Synth({ oscillator: { type: 'sine' }, envelope: { attack: 0.01, decay: 0.2, sustain: 0.2, release: 0.5 } }).toDestination();
+        if (!sfxSynth) sfxSynth = new Tone.PolySynth(Tone.Synth, { oscillator: { type: 'triangle' }, envelope: { attack: 0.005, decay: 0.1, sustain: 0.05, release: 0.2 }, volume: 0 }).toDestination();
+        if (!errorSfxSynth) errorSfxSynth = new Tone.Synth({ oscillator: { type: 'square' }, envelope: { attack: 0.001, decay: 0.08, sustain: 0.0, release: 0.08 }, volume: -5 }).toDestination();
+        if (!extraLifeSfx) extraLifeSfx = new Tone.PolySynth(Tone.Synth, { oscillator: { type: "fatsawtooth" }, envelope: { attack: 0.01, decay: 0.4, sustain: 0.1, release: 0.4 }, volume: -8 }).toDestination();
+        if (music) music.dispose();
+        const melody = ['C4', 'C4', 'D4', 'C4', 'F4', 'E4', null, 'C4', 'C4', 'D4', 'C4', 'G4', 'F4', null, 'C4', 'C4', 'C5', 'A4', 'F4', 'E4', 'D4', null, 'A#4', 'A#4', 'A4', 'F4', 'G4', 'F4', null];
+        music = new Tone.Sequence((time, note) => { if(note) musicSynth.triggerAttackRelease(note, '8n', time); }, melody, '4n');
+        music.loop = true;
+        Tone.Transport.bpm.value = 100;
+    }
+
+    function resetState() {
+        state = {
+            score: 0, level: 1, gameOver: false, gameStarted: false, animationId: null, lives: config.initialLives,
+            player: { ...config.player, x: 0, y: 0, invincibilityFrames: 0 },
+            objects: [], particles: [], balloons: [], timers: [],
+            currentSpeed: config.baseSpeed, nextLevelScore: config.levelUpBaseScore,
+            nextLifeScore: 1000,
+            powerUp: { active: false, timeout: null, startTime: 0 }, levelUpAnim: 0,
+            keys: { ArrowLeft: false, ArrowRight: false },
+            stats: { cakesCaught: 0, veggiesHit: 0, goldenCaught: 0, giftsCollected: 0 },
+            theme: { currentIndex: 0, transitionProgress: -1, transitionDuration: 180 },
+            paused: false, howToPlayOrigin: 'start',
+        };
+    }
+    
+    function resetStartScreenForDisplay() {
+        dom.startScreen.classList.remove('hidden', 'fade-out');
+        dom.startScreen.style.pointerEvents = 'auto';
+        dom.startScreenContent.classList.remove('hidden');
+        dom.container.classList.remove('show-how-to-play', 'show-stats');
+        dom.pauseButton.classList.add('hidden');
+        dom.gameOverScreen.classList.add('hidden');
+        dom.highScoreDisplay.innerHTML = `En Yüksek Skor: ${savedData.highScore}`;
+    }
+
+    function startGame() {
+        clearTimeout(idleTimer);
+        dom.startScreen.classList.add('fade-out');
+        dom.startScreen.style.pointerEvents = 'none';
+        setTimeout(() => {
+            dom.startScreen.classList.add('hidden');
+            dom.startScreen.classList.remove('fade-out');
+            dom.startScreen.style.pointerEvents = 'auto';
+            if (state && state.timers) { state.timers.forEach(clearTimeout); state.timers.forEach(clearInterval); }
+            resetState();
+            state.gameStarted = true;
+            dom.gameOverScreen.classList.add('hidden');
+            dom.pauseButton.classList.remove('hidden');
+            dom.pauseScreen.classList.add('hidden');
+            dom.countdownScreen.classList.add('hidden');
+            dom.gameCanvas.classList.remove('fade-out');
+            dom.container.classList.remove('show-how-to-play');
+            dom.newHighScoreMessage.classList.add('hidden');
+            if (Tone.context.state !== 'running') {
+                Tone.start().then(() => {
+                    setupAudio();
+                    if (music && music.state !== 'started') { music.start(0); Tone.Transport.start(); }
+                });
+            } else {
+                setupAudio();
+                if (music && music.state !== 'started') { music.start(0); Tone.Transport.start(); }
+            }
+            resizeCanvas();
+            updateUI();
+            for (let i = 0; i < 7; i++) createBalloon(true);
+            scheduleNextBurst();
+            state.timers.push(setTimeout(() => showMessage(), 8000));
+            state.timers.push(setInterval(() => createBalloon(false), 2500));
+            gameLoop();
+        }, 400);
+    }
+
+    function endGame() {
+        state.gameOver = true;
+        cancelAnimationFrame(state.animationId);
+        state.timers.forEach(clearTimeout);
+        state.timers.forEach(clearInterval);
+        if(state.powerUp.timeout) clearTimeout(state.powerUp.timeout);
+        dom.powerUpTimerContainer.classList.add('hidden');
+        if (music && music.state === 'started') music.stop();
+        
+        savedData.gamesPlayed++;
+        savedData.totalScore += state.score;
+        savedData.totalCakesCaught += state.stats.cakesCaught;
+        savedData.totalVeggiesHit += state.stats.veggiesHit;
+        savedData.totalGiftsCollected += state.stats.giftsCollected;
+
+        if (state.score > savedData.highScore) {
+            savedData.highScore = state.score;
+            dom.newHighScoreMessage.classList.remove('hidden');
+        }
+        checkAchievements(true); 
+        saveGameData();
+
+        dom.finalScore.textContent = state.score;
+        dom.cakesCaught.textContent = state.stats.cakesCaught;
+        dom.veggiesAvoided.textContent = state.stats.veggiesHit;
+        dom.maxLevel.textContent = state.level;
+        dom.gameOverScreen.classList.remove('hidden');
+        dom.pauseButton.classList.add('hidden');
+        dom.pauseScreen.classList.add('hidden');
+        dom.countdownScreen.classList.add('hidden');
+        dom.container.classList.add('show-how-to-play');
+        dom.gameOverTitle.textContent = "Oyun Bitti!";
+    }
+
+    function returnToMainMenu() {
+        dom.gameCanvas.classList.add('fade-out');
+        dom.pauseScreen.classList.remove('active');
+        setTimeout(() => {
+            cancelAnimationFrame(state.animationId);
+            state.timers.forEach(clearTimeout);
+            state.timers.forEach(clearInterval);
+            state.timers = [];
+            if (music && music.state === 'started') music.stop();
+            Tone.Transport.stop();
+            Tone.Transport.cancel();
+            if (musicSynth) { musicSynth.dispose(); musicSynth = null; }
+            if (sfxSynth) { sfxSynth.dispose(); sfxSynth = null; }
+            if (errorSfxSynth) { errorSfxSynth.dispose(); errorSfxSynth = null; }
+            if (extraLifeSfx) { extraLifeSfx.dispose(); extraLifeSfx = null; }
+            music = null;
+            dom.pauseScreen.classList.add('hidden');
+            dom.gameOverScreen.classList.add('hidden');
+            dom.countdownScreen.classList.add('hidden');
+            dom.pauseButton.classList.add('hidden');
+            resetState();
+            resetStartScreenForDisplay();
+            startMenuAnimation();
+            setupAudio();
+            dom.gameCanvas.classList.remove('fade-out');
+            resetIdleTimer();
+        }, 600);
+    }
+
+    function togglePause() {
+        if (!state.gameStarted || state.gameOver) return;
+        state.paused = !state.paused;
+        if (state.paused) {
+            cancelAnimationFrame(state.animationId);
+            state.timers.forEach(clearTimeout);
+            state.timers.forEach(clearInterval);
+            state.timers = [];
+            if (music && music.state === 'started') Tone.Transport.stop();
+            dom.pauseScreen.classList.remove('hidden');
+            dom.pauseScreen.classList.add('active');
+            dom.container.classList.add('show-how-to-play');
+        } else {
+            dom.pauseScreen.classList.remove('active');
+            setTimeout(() => {
+                dom.pauseScreen.classList.add('hidden');
+                dom.container.classList.remove('show-how-to-play');
+                let countdownValue = 3;
+                dom.countdownDisplay.textContent = countdownValue;
+                dom.countdownScreen.classList.remove('hidden');
+                dom.countdownScreen.classList.add('active');
+                const countdownInterval = setInterval(() => {
+                    countdownValue--;
+                    if (countdownValue > 0) {
+                        dom.countdownDisplay.textContent = countdownValue;
+                    } else {
+                        clearInterval(countdownInterval);
+                        dom.countdownScreen.classList.remove('active');
+                        dom.countdownScreen.classList.add('hidden');
+                        if (music && music.state !== 'started') Tone.Transport.start();
+                        scheduleNextBurst();
+                        gameLoop();
+                    }
+                }, 1000);
+            }, 600);
+        }
+    }
+
+    function showHowToPlayScreen() {
+        dom.startScreenContent.classList.add('hidden');
+        dom.container.classList.add('show-how-to-play');
+        dom.howToPlayScreen.classList.add('active');
+    }
+
+    function handleBackButton() {
+        dom.howToPlayScreen.classList.remove('active');
+        setTimeout(() => {
+            dom.container.classList.remove('show-how-to-play');
+            dom.startScreenContent.classList.remove('hidden');
+        }, 400);
+    }
+    
+    function showStatsScreen() {
+        updateStatsScreen();
+        dom.startScreenContent.classList.add('hidden');
+        dom.container.classList.add('show-stats');
+        dom.statsScreen.classList.add('active');
+    }
+
+    function hideStatsScreen() {
+        dom.statsScreen.classList.remove('active');
+        setTimeout(() => {
+            dom.container.classList.remove('show-stats');
+            dom.startScreenContent.classList.remove('hidden');
+        }, 400);
+    }
+
+    function updateStatsScreen() {
+        dom.statsList.innerHTML = `
+            <span class="font-semibold text-white/70">Toplam Puan:</span> <span>${savedData.totalScore}</span>
+            <span class="font-semibold text-white/70">Oynanan Oyun:</span> <span>${savedData.gamesPlayed}</span>
+            <span class="font-semibold text-white/70">Yakalanan Pasta:</span> <span>${savedData.totalCakesCaught}</span>
+            <span class="font-semibold text-white/70">Çarpılan Sebze:</span> <span>${savedData.totalVeggiesHit}</span>
+        `;
+        
+        dom.achievementsList.innerHTML = '';
+        Object.values(config.achievements).forEach(ach => {
+            const isUnlocked = savedData.unlockedAchievements.includes(ach.id);
+            let progressHtml = '';
+            if (!isUnlocked && ach.progress) {
+                const progressData = ach.progress(state, savedData);
+                const percent = Math.min(100, (progressData.current / progressData.target) * 100);
+                progressHtml = `
+                    <div class="progress-bar">
+                        <div class="progress-bar-inner" style="width: ${percent}%"></div>
+                    </div>
+                    <p class="text-xs text-right text-white/60 mt-1">${progressData.current} / ${progressData.target}</p>
+                `;
+            }
+
+            const item = document.createElement('div');
+            item.className = `achievement-item p-2 rounded-lg bg-white/10 ${isUnlocked ? '' : 'locked'}`;
+            item.innerHTML = `
+                <div class="flex items-center">
+                    <span class="text-3xl mr-4">${ach.icon}</span>
+                    <div>
+                        <h4 class="font-bold">${ach.title}</h4>
+                        <p class="text-xs sm:text-sm text-white/80">${ach.description}</p>
+                    </div>
+                </div>
+                ${progressHtml}
+            `;
+            dom.achievementsList.appendChild(item);
+        });
+    }
+
+    function gameLoop() {
+        if (state.gameOver || state.paused) return;
+        handlePlayerMovement();
+        update();
+        draw();
+        state.animationId = requestAnimationFrame(gameLoop);
+    }
+
+    function handlePlayerMovement() {
+        if (!state || state.gameOver || state.paused) return;
+        if (state.keys.ArrowLeft || state.keys.ArrowRight) {
+            state.playerMoved = true;
+        }
+        if (state.keys.ArrowLeft && state.player.x > 0) state.player.x -= state.player.speed;
+        if (state.keys.ArrowRight && state.player.x < canvas.width - state.player.width) state.player.x += state.player.speed;
+    }
+
+    function update() {
+        extraLifeGrantedThisFrame = false;
+        checkExtraLife();
+        state.particles.forEach((p, i) => { p.x += p.vx; p.y += p.vy; p.alpha -= 0.02; if (p.alpha <= 0) state.particles.splice(i, 1); });
+        state.balloons.forEach(b => { b.y -= b.speed; if (b.y < -50) resetBalloon(b); });
+        if (state.levelUpAnim > 0) state.levelUpAnim--;
+        if (state.theme.transitionProgress >= 0) state.theme.transitionProgress++;
+        if (state.powerUp.active) updatePowerUpTimer();
+        if (state.player.invincibilityFrames > 0) state.player.invincibilityFrames--;
+        const remainingObjects = [];
+        for (const obj of state.objects) {
+            const speedMultiplier = state.powerUp.active ? 0.5 : 1;
+            obj.y += state.currentSpeed * speedMultiplier;
+            if(obj.isGolden) obj.shimmerParticles.forEach(p => p.angle += 0.1);
+            const hasCollision = obj.x < state.player.x + state.player.width && obj.x + 30 > state.player.x && obj.y < state.player.y + state.player.height && obj.y + 30 > state.player.y;
+            if (hasCollision) {
+                if (obj.points > 0) {
+                    state.score += obj.points;
+                    state.stats.cakesCaught++;
+                    if (obj.isGolden) state.stats.goldenCaught++;
+                    if (obj.powerUp) state.stats.giftsCollected++;
+                    createParticles(obj.x, obj.y, obj.isGolden);
+                    triggerAnimation(dom.scoreDisplay, 'score-pulse-anim');
+                    if (obj.isGolden) playSoundEffect('extraLife');
+                    else if (!extraLifeGrantedThisFrame) playSoundEffect('collect');
+                    if (obj.powerUp) activatePowerUp();
+                } else {
+                    if (state.player.invincibilityFrames <= 0) {
+                        state.lives--;
+                        state.stats.veggiesHit++;
+                        playSoundEffect('error');
+                        if (navigator.vibrate) navigator.vibrate(75);
+                        triggerAnimation(dom.container, 'shake-anim');
+                        activateInvincibility();
+                        if (state.lives <= 0) endGame();
+                    }
+                }
+            } else if (obj.y < canvas.height) {
+                remainingObjects.push(obj);
+            }
+        }
+        state.objects = remainingObjects;
+        checkLevelUp();
+        updateUI();
+        checkAchievements();
+    }
+
+    function draw() {
+        drawBackground(ctx, state.theme);
+        
+        state.balloons.forEach(b => { 
+            ctx.globalAlpha = b.alpha;
+            const img = assets[b.assetId];
+            if (img) ctx.drawImage(img, b.x, b.y, 40, 40);
+        });
+
+        ctx.globalAlpha = 1.0;
+        const playerImg = assets[state.player.assetId];
+        if(playerImg) ctx.drawImage(playerImg, state.player.x, state.player.y, state.player.width, state.player.height);
+        
+        state.objects.forEach(obj => {
+            if (state.player.invincibilityFrames > 0 && obj.points < 0) {
+                if (Math.floor(state.player.invincibilityFrames / 10) % 2 === 0) ctx.globalAlpha = 0.5;
+            }
+            if (obj.isGolden) drawGoldenEffects(obj);
+            
+            const objImg = assets[obj.assetId];
+            if (objImg) ctx.drawImage(objImg, obj.x, obj.y, 36, 36);
+
+            ctx.globalAlpha = 1.0;
+        });
+        state.particles.forEach(p => { ctx.globalAlpha = p.alpha; ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill(); });
+        ctx.globalAlpha = 1.0;
+        if(state.levelUpAnim > 0) {
+            const t = state.levelUpAnim, FADE_TIME = 30;
+            const alpha = t < FADE_TIME ? t/FADE_TIME : (t > 150-FADE_TIME ? (150-t)/FADE_TIME : 1);
+            const text = 'SEVİYE ATLANDI!';
+            ctx.save();
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            let fontSize = 70 * (canvas.width / 420);
+            ctx.font = `900 ${fontSize}px 'Inter', sans-serif`;
+            while (ctx.measureText(text).width > canvas.width * 0.9 && fontSize > 10) {
+                fontSize--;
+                ctx.font = `900 ${fontSize}px 'Inter', sans-serif`;
+            }
+            ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 0.8})`;
+            ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 10;
+            ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+            ctx.restore();
+        }
+    }
+
+    function drawGoldenEffects(obj) {
+        const centerX = obj.x + 18, centerY = obj.y + 18;
+        ctx.fillStyle = 'rgba(255, 223, 0, 0.05)';
+        for (let i = 0; i < 10; i++) { ctx.beginPath(); ctx.arc(centerX, centerY - i * 5, 15 - i * 1.5, 0, Math.PI * 2); ctx.fill(); }
+        ctx.fillStyle = '#FFD700';
+        obj.shimmerParticles.forEach(p => {
+            const px = centerX + Math.cos(p.angle) * p.radius;
+            const py = centerY + Math.sin(p.angle) * p.radius;
+            ctx.beginPath(); ctx.arc(px, py, p.size, 0, Math.PI * 2); ctx.fill();
+        });
+    }
+
+    function drawBackground(targetCtx, themeState) {
+        const fromTheme = config.themes[themeState.currentIndex];
+        let grad = targetCtx.createLinearGradient(0, 0, 0, targetCtx.canvas.height);
+        grad.addColorStop(0, fromTheme.start); grad.addColorStop(1, fromTheme.end);
+        targetCtx.fillStyle = grad;
+        targetCtx.fillRect(0, 0, targetCtx.canvas.width, targetCtx.canvas.height);
+        if (themeState.transitionProgress >= 0) {
+            const toThemeIndex = (themeState.currentIndex + 1) % config.themes.length;
+            const toTheme = config.themes[toThemeIndex];
+            const alpha = themeState.transitionProgress / themeState.transitionDuration;
+            let transGrad = targetCtx.createLinearGradient(0, 0, 0, targetCtx.canvas.height);
+            transGrad.addColorStop(0, toTheme.start); transGrad.addColorStop(1, toTheme.end);
+            targetCtx.globalAlpha = alpha;
+            targetCtx.fillStyle = transGrad;
+            targetCtx.fillRect(0, 0, targetCtx.canvas.width, targetCtx.canvas.height);
+            targetCtx.globalAlpha = 1.0;
+            if (alpha >= 1) { themeState.currentIndex = toThemeIndex; themeState.transitionProgress = -1; }
+        }
+    }
+
+    function scheduleNextBurst() {
+        if (state.gameOver || state.paused) return;
+        const baseDelay = 1800, minDelay = 700, randomness = 500;
+        const delayReduction = (state.level - 1) * 100;
+        const burstDelay = Math.max(minDelay, baseDelay - delayReduction) + Math.random() * randomness;
+        const timeoutId = setTimeout(() => { executeBurst(); scheduleNextBurst(); }, burstDelay);
+        state.timers.push(timeoutId);
+    }
+
+    function executeBurst() {
+        if (state.gameOver || state.paused) return;
+        const numObjects = 1 + Math.floor(Math.random() * (1 + state.level / 2));
+        for (let i = 0; i < numObjects; i++) {
+            const spawnStagger = i * (50 + Math.random() * 150);
+            const timeoutId = setTimeout(createFallingObject, spawnStagger);
+            state.timers.push(timeoutId);
+        }
+    }
+
+    function createFallingObject() {
+        if (state.gameOver || state.paused) return;
+        let type;
+        const rand = Math.random();
+        if (rand < config.negativeItemChance) {
+            type = { ...config.objectTypes.negative[Math.floor(Math.random() * config.objectTypes.negative.length)] };
+        } else if (rand < config.negativeItemChance + config.goldenCupcakeChance) {
+            type = { ...config.objectTypes.golden, shimmerParticles: [] };
+            for (let i = 0; i < 10; i++) type.shimmerParticles.push({ angle: Math.random() * Math.PI * 2, radius: Math.random() * 15 + 15, size: Math.random() * 2 + 1 });
+        } else if (rand < config.negativeItemChance + config.goldenCupcakeChance + config.powerUpChance) {
+            type = { ...config.objectTypes.powerUp };
+        } else {
+            type = { ...config.objectTypes.positive[Math.floor(Math.random() * config.objectTypes.positive.length)] };
+        }
+        state.objects.push({ ...type, x: Math.random() * (canvas.width - 40), y: -40 });
+    }
+
+    function createParticles(x, y, isBigBurst) {
+        const count = isBigBurst ? 50 : 15;
+        const speed = isBigBurst ? 8 : 4;
+        for (let i = 0; i < count; i++) {
+            state.particles.push({ x, y, vx: (Math.random() - 0.5) * speed, vy: (Math.random() - 0.5) * (speed + 2), size: Math.random() * 3 + 1, alpha: 1, color: ['#ffc700', '#ff0000', '#24ff00', '#00aeff'][Math.floor(Math.random()*4)] });
+        }
+    }
+
+    function createBalloon(isInitial) {
+        if (state.gameOver || state.paused) return;
+        const balloon = {};
+        resetBalloon(balloon, isInitial);
+        state.balloons.push(balloon);
+    }
+
+    function resetBalloon(b, isInitial = false) {
+        b.assetId = config.balloonAssetIds[Math.floor(Math.random() * config.balloonAssetIds.length)];
+        b.x = Math.random() * canvas.width;
+        b.y = isInitial ? Math.random() * canvas.height : canvas.height + 50;
+        b.speed = Math.random() * 0.5 + 0.3;
+        b.alpha = Math.random() * 0.4 + 0.2;
+    }
+
+    function playSoundEffect(type) {
+        if (isMuted) return;
+        const now = Tone.now();
+        if (now - lastSfxTime < 0.05) { if (type !== 'extraLife') return; }
+        lastSfxTime = now;
+        if (type === 'collect' && sfxSynth) { sfxSynth.triggerAttackRelease("C5", "16n", now); sfxSynth.triggerAttackRelease("G5", "16n", now + 0.05); } 
+        else if (type === 'error' && errorSfxSynth) { errorSfxSynth.triggerAttackRelease("F3", "16n", now); errorSfxSynth.triggerAttackRelease("C3", "16n", now + 0.1); } 
+        else if (type === 'extraLife' && extraLifeSfx) { extraLifeSfx.triggerAttackRelease("G5", "16n", now); extraLifeSfx.triggerAttackRelease("C6", "16n", now + 0.05); extraLifeSfx.triggerAttackRelease("E6", "16n", now + 0.1); }
+    }
+
+    function activateInvincibility() { state.player.invincibilityFrames = config.invincibilityDuration; }
+
+    function checkLevelUp() {
+        if (state.score >= state.nextLevelScore) {
+            const pointsForNextLevel = config.levelUpBaseScore + ((state.level -1) * config.levelUpIncrement);
+            state.nextLevelScore += pointsForNextLevel;
+            state.level++;
+            state.currentSpeed += config.speedIncrement;
+            state.levelUpAnim = 150;
+            if ((state.level -1) % config.themeChangeLevel === 0 && state.level > 1) {
+                state.theme.transitionProgress = 0;
+            }
+        }
+    }
+
+    function checkExtraLife() {
+        if (state.score >= state.nextLifeScore) {
+            state.lives++;
+            playSoundEffect('extraLife');
+            showMessage('EKSTRA CAN! ❤️');
+            extraLifeGrantedThisFrame = true;
+            state.nextLifeScore += 1000;
+        }
+    }
+
+    function activatePowerUp() {
+        if (state.powerUp.active) return;
+        state.powerUp.active = true;
+        state.powerUp.startTime = Date.now();
+        dom.powerUpTimerContainer.classList.remove('hidden');
+        showMessage('ZAMAN YAVAŞLADI!');
+        state.powerUp.timeout = setTimeout(() => {
+            state.powerUp.active = false;
+            dom.powerUpTimerContainer.classList.add('hidden');
+        }, config.powerUpDuration);
+    }
+
+    function updatePowerUpTimer() {
+        const elapsedTime = Date.now() - state.powerUp.startTime;
+        const remainingPercentage = 100 - (elapsedTime / config.powerUpDuration * 100);
+        dom.powerUpTimerBar.style.width = `${Math.max(0, remainingPercentage)}%`;
+    }
+
+    function showMessage(text) {
+        const msgEl = dom.specialMessage;
+        msgEl.textContent = text || config.messages[Math.floor(Math.random() * config.messages.length)];
+        msgEl.classList.remove('hidden', 'special-message');
+        void msgEl.offsetWidth;
+        msgEl.classList.add('special-message');
+    }
+
+    function updateUI() {
+        dom.scoreDisplay.textContent = state.score;
+        dom.levelDisplay.textContent = `Seviye: ${state.level}`;
+
+        const currentHeartCount = dom.livesDisplay.children.length;
+
+        if (currentHeartCount < state.lives) {
+            for (let i = 0; i < state.lives - currentHeartCount; i++) {
+                const heart = document.createElement('span');
+                heart.textContent = '❤️';
+                heart.classList.add('life-heart', 'life-fade-in');
+                dom.livesDisplay.appendChild(heart);
+            }
+        } else if (currentHeartCount > state.lives) {
+            const heartsToRemove = currentHeartCount - state.lives;
+            for (let i = 0; i < heartsToRemove; i++) {
+                const lastHeart = dom.livesDisplay.lastChild;
+                if (lastHeart) {
+                    lastHeart.classList.add('life-fade-out');
+                    lastHeart.addEventListener('animationend', () => {
+                        if (lastHeart.parentElement === dom.livesDisplay) {
+                             dom.livesDisplay.removeChild(lastHeart);
+                        }
+                    }, { once: true });
+                }
+            }
+        }
+    }
+
+    function triggerAnimation(element, className) {
+        element.classList.remove(className);
+        void element.offsetWidth;
+        element.classList.add(className);
+        element.addEventListener('animationend', () => {
+            element.classList.remove(className);
+        }, { once: true });
+    }
+
+    function resizeCanvas() {
+        canvas.width = dom.container.clientWidth;
+        canvas.height = dom.container.clientHeight;
+        menuCanvas.width = dom.container.clientWidth;
+        menuCanvas.height = dom.container.clientHeight;
+        if (state) {
+            const scaleFactor = canvas.width / 420;
+            state.player.width = 60 * scaleFactor;
+            state.player.height = 50 * scaleFactor;
+            state.player.speed = 8 * scaleFactor;
+            state.player.x = canvas.width / 2 - state.player.width / 2;
+            state.player.y = canvas.height - state.player.height - 10;
+        }
+    }
+
+    function startMenuAnimation() {
+        if (menuAnimationId) cancelAnimationFrame(menuAnimationId);
+        drawBackground(menuCtx, menuThemeState);
+        requestAnimationFrame(menuLoop);
+        resetIdleTimer();
+    }
+
+    function stopMenuAnimation() { if (menuAnimationId) cancelAnimationFrame(menuAnimationId); }
+    
+    let idleTimer = null;
+    let isNesibeAnimationRunning = false;
+    let nesibeAnimationState = {
+        word: 'NESİBE', letterIndex: 0, wordCount: 0, maxWords: 3,
+        lastSpawnTime: 0, letterSpawnInterval: 400, wordSpawnInterval: 2500,
+        letterParticles: []
+    };
+
+    function menuLoop(timestamp) {
+        if (menuThemeState.transitionProgress >= 0) menuThemeState.transitionProgress++;
+        else {
+            menuThemeState.nextTransitionFrame--;
+            if (menuThemeState.nextTransitionFrame <= 0) {
+                menuThemeState.transitionProgress = 0;
+                menuThemeState.nextTransitionFrame = 600;
+            }
+        }
+        drawBackground(menuCtx, menuThemeState);
+
+        if (isNesibeAnimationRunning) {
+            const letterSpacing = 45 * (menuCanvas.width / 420);
+            const wordWidth = (nesibeAnimationState.word.length - 1) * letterSpacing;
+            const startX = (menuCanvas.width / 2) - (wordWidth / 2);
+
+            let readyToSpawn = false;
+            if (nesibeAnimationState.wordCount < nesibeAnimationState.maxWords) {
+                 const interval = (nesibeAnimationState.letterIndex === 0 && nesibeAnimationState.wordCount > 0)
+                    ? nesibeAnimationState.wordSpawnInterval
+                    : nesibeAnimationState.letterSpawnInterval;
+                if (!nesibeAnimationState.lastSpawnTime || timestamp - nesibeAnimationState.lastSpawnTime > interval) {
+                    readyToSpawn = true;
+                }
+            }
+            
+            if (readyToSpawn) {
+                const letter = nesibeAnimationState.word[nesibeAnimationState.letterIndex];
+                const particle = {
+                    text: letter, // Use 'text' to differentiate from image particles
+                    x: startX + (nesibeAnimationState.letterIndex * letterSpacing) + (Math.random() - 0.5) * 10,
+                    y: -50,
+                    speed: (Math.random() * 0.5 + 0.9) * (menuCanvas.height / 600),
+                    rotation: (Math.random() - 0.5) * 0.2,
+                    rotationSpeed: (Math.random() - 0.5) * 0.01,
+                    isLetter: true,
+                };
+                menuParticles.push(particle);
+                nesibeAnimationState.letterParticles.push(particle);
+                nesibeAnimationState.letterIndex++;
+                nesibeAnimationState.lastSpawnTime = timestamp;
+
+                if (nesibeAnimationState.letterIndex >= nesibeAnimationState.word.length) {
+                    nesibeAnimationState.wordCount++;
+                    nesibeAnimationState.letterIndex = 0;
+                }
+            }
+
+            if (nesibeAnimationState.wordCount >= nesibeAnimationState.maxWords &&
+                nesibeAnimationState.letterParticles.every(p => p.y > menuCanvas.height + 50)) {
+                isNesibeAnimationRunning = false;
+                nesibeAnimationState.letterParticles = [];
+                resetIdleTimer();
+            }
+
+        } else {
+            if (Math.random() < 0.02) {
+                const assetId = config.menuAssetIds[Math.floor(Math.random() * config.menuAssetIds.length)];
+                menuParticles.push({ 
+                    assetId: assetId,
+                    x: Math.random() * menuCanvas.width, 
+                    y: -40, 
+                    speed: (Math.random() * 0.5 + 0.2) * (menuCanvas.height / 600), 
+                    rotation: Math.random() * Math.PI * 2, 
+                    rotationSpeed: (Math.random() - 0.5) * 0.02,
+                    width: 40,
+                    height: 40,
+                    isLetter: false
+                });
+            }
+        }
+       
+        menuParticles = menuParticles.filter(p => p.y < menuCanvas.height + 50);
+        menuParticles.forEach(p => {
+            p.y += p.speed;
+            p.rotation += p.rotationSpeed;
+            menuCtx.save();
+            menuCtx.translate(p.x, p.y);
+            menuCtx.rotate(p.rotation);
+            
+            if (p.isLetter) {
+                const fontSize = 45 * (menuCanvas.width / 420);
+                menuCtx.font = `bold ${fontSize}px 'Pacifico', cursive`;
+                menuCtx.fillStyle = '#ec4899';
+                menuCtx.shadowColor = 'rgba(255, 105, 180, 0.9)';
+                menuCtx.shadowBlur = 15;
+                menuCtx.textAlign = 'center';
+                menuCtx.textBaseline = 'middle';
+                menuCtx.fillText(p.text, 0, 0);
+            } else {
+                const img = assets[p.assetId];
+                if(img) menuCtx.drawImage(img, -p.width/2, -p.height/2, p.width, p.height);
+            }
+            menuCtx.restore();
+        });
+
+        menuAnimationId = requestAnimationFrame(menuLoop);
+    }
+    
+    async function shareScore() {
+        const shareButton = dom.shareButton;
+        shareButton.textContent = "Hazırlanıyor...";
+        shareButton.disabled = true;
+        const screenshotBg = document.getElementById('screenshot-bg');
+        const text = `Nesibe'nin doğum günü oyununda ${state.score} puan yaptım! Sen de oyna! 🥳`;
+        try {
+            screenshotBg.classList.remove('hidden');
+            const canvasElement = await html2canvas(dom.gameOverScreen, { backgroundColor: null, useCORS: true });
+            screenshotBg.classList.add('hidden');
+            const blob = await new Promise(resolve => canvasElement.toBlob(resolve, 'image/png'));
+            const file = new File([blob], 'dogumgunu-skoru.png', { type: 'image/png' });
+            if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+                await navigator.share({
+                    title: 'Doğum Günü Oyunu Skorum!',
+                    text: text,
+                    files: [file],
+                });
+            } else {
+                window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+            }
+        } catch (error) {
+            console.error('Paylaşım sırasında hata oluştu:', error);
+            screenshotBg.classList.add('hidden');
+            window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+        } finally {
+            shareButton.textContent = "Sonucu Paylaş";
+            shareButton.disabled = false;
+        }
+    }
+
+    function checkAchievements(isGameOver = false) {
+        Object.values(config.achievements).forEach(ach => {
+            if (!ach.unlocked && ach.condition(state, savedData)) {
+                ach.unlocked = true;
+                showAchievementPopup(ach);
+                if(!isGameOver) saveGameData();
+            }
+        });
+    }
+
+    function showAchievementPopup(achievement) {
+        dom.achievementIcon.textContent = achievement.icon;
+        dom.achievementTitle.textContent = achievement.title;
+        dom.achievementDesc.textContent = achievement.description;
+        dom.achievementToast.classList.add('show');
+        setTimeout(() => {
+            dom.achievementToast.classList.remove('show');
+        }, 4000);
+    }
+
+    function checkOrientation() {
+        const isLandscape = window.innerHeight < window.innerWidth;
+        if (isLandscape && isTouchDevice() && !forceLandscapeAllowed) {
+            dom.orientationWarning.classList.remove('hidden');
+            dom.mainContent.classList.add('hidden');
+        } else {
+            dom.orientationWarning.classList.add('hidden');
+            dom.mainContent.classList.remove('hidden');
+        }
+    }
+    
+    document.addEventListener('keydown', e => {
+        if (state && e.key === 'Escape') togglePause();
+        else if (state && state.keys && e.key in state.keys) state.keys[e.key] = true;
+    });
+    document.addEventListener('keyup', e => {
+        if (state && state.keys && e.key in state.keys) state.keys[e.key] = false;
+    });
+    
+    canvas.addEventListener('touchmove', e => {
+        e.preventDefault();
+        if (!state || !state.gameStarted || state.gameOver || state.paused) return;
+        state.playerMoved = true;
+        const touchX = e.touches[0].clientX - canvas.getBoundingClientRect().left;
+        state.player.x = touchX - state.player.width / 2;
+        if (state.player.x < 0) state.player.x = 0;
+        if (state.player.x > canvas.width - state.player.width) state.player.x = canvas.width - state.player.width;
+    }, { passive: false });
+
+    window.addEventListener('resize', () => {
+        checkOrientation();
+        resizeCanvas();
+    });
+    window.addEventListener('orientationchange', checkOrientation);
+    
+    dom.startButton.addEventListener('click', startGame);
+    dom.restartButton.addEventListener('click', startGame);
+    dom.gameOverMainMenuButton.addEventListener('click', returnToMainMenu);
+    dom.muteButton.addEventListener('click', () => {
+        isMuted = !isMuted;
+        Tone.Destination.mute = isMuted;
+        dom.muteButton.textContent = isMuted ? '🔇' : '🔊';
+    });
+    
+    dom.pauseButton.addEventListener('click', togglePause);
+    dom.continueButton.addEventListener('click', togglePause);
+    dom.mainMenuButton.addEventListener('click', returnToMainMenu);
+    dom.howToPlayButton.addEventListener('click', showHowToPlayScreen);
+    dom.backButton.addEventListener('click', handleBackButton);
+    dom.statsButton.addEventListener('click', showStatsScreen);
+    dom.statsBackButton.addEventListener('click', hideStatsScreen);
+    dom.shareButton.addEventListener('click', shareScore);
+
+    let titleClickCount = 0;
+    let titleClickTimer = null;
+    dom.mainTitle.addEventListener('click', () => {
+        clearTimeout(titleClickTimer);
+        titleClickCount++;
+        if (titleClickCount === 5) {
+            dom.signature.classList.remove('hidden');
+            dom.signature.classList.add('signature-show');
+            dom.signature.addEventListener('animationend', () => {
+                dom.signature.classList.add('hidden');
+                dom.signature.classList.remove('signature-show');
+            }, { once: true });
+            titleClickCount = 0;
+        }
+        titleClickTimer = setTimeout(() => { titleClickCount = 0; }, 1000);
+    });
+
+    let pressTimer = null;
+    let originalHighScoreText = '';
+    const startPress = (e) => {
+        e.preventDefault();
+        originalHighScoreText = dom.highScoreDisplay.innerHTML;
+        pressTimer = setTimeout(() => {
+            dom.highScoreDisplay.innerHTML = 'Made with ❤️ by TheMVT™';
+            setTimeout(() => {
+                dom.highScoreDisplay.innerHTML = originalHighScoreText;
+            }, 4000);
+        }, 5000);
+    };
+    const cancelPress = () => { clearTimeout(pressTimer); };
+    dom.highScoreDisplay.addEventListener('mousedown', startPress);
+    dom.highScoreDisplay.addEventListener('touchstart', startPress, { passive: true });
+    dom.highScoreDisplay.addEventListener('mouseup', cancelPress);
+    dom.highScoreDisplay.addEventListener('mouseleave', cancelPress);
+    dom.highScoreDisplay.addEventListener('touchend', cancelPress);
+    dom.highScoreDisplay.addEventListener('touchcancel', cancelPress);
+    
+    function triggerNesibeAnimation() {
+        if (isNesibeAnimationRunning || (state && state.gameStarted)) return;
+        isNesibeAnimationRunning = true;
+        nesibeAnimationState.letterIndex = 0;
+        nesibeAnimationState.wordCount = 0;
+        nesibeAnimationState.lastSpawnTime = 0;
+        nesibeAnimationState.letterParticles = [];
+        menuParticles.length = 0;
+    }
+
+    function resetIdleTimer() {
+        clearTimeout(idleTimer);
+        if (state && !state.gameStarted) {
+            idleTimer = setTimeout(triggerNesibeAnimation, 60000);
+        }
+    }
+    window.addEventListener('mousemove', resetIdleTimer, { passive: true });
+    window.addEventListener('mousedown', resetIdleTimer, { passive: true });
+    window.addEventListener('touchstart', resetIdleTimer, { passive: true });
+    window.addEventListener('keydown', resetIdleTimer, { passive: true });
+
+    let avatarClickCount = 0;
+    let avatarClickTimer = null;
+    dom.gameOverAvatar.addEventListener('click', () => {
+        clearTimeout(avatarClickTimer);
+        avatarClickCount++;
+        if (avatarClickCount === 3) {
+            const score = state.score;
+            let message = '';
+            if (score < 1000) { message = 'Senden Beklediğim Bu Değildi'; }
+            else if (score >= 1000 && score < 2000) { message = 'Fena Değildin'; }
+            else if (score >= 2000 && score < 3000) { message = 'İyi Oynadın!'; }
+            else { message = 'Harika Oynadın!'; }
+            const originalTitle = dom.gameOverTitle.textContent;
+            dom.gameOverTitle.textContent = message;
+            triggerAnimation(dom.gameOverTitle, 'score-pulse-anim');
+            setTimeout(() => { dom.gameOverTitle.textContent = originalTitle; }, 10000);
+            avatarClickCount = 0;
+        }
+        avatarClickTimer = setTimeout(() => { avatarClickCount = 0; }, 1000);
+    });
+
+    dom.continueLandscapeButton.addEventListener('click', () => {
+        forceLandscapeAllowed = true;
+        checkOrientation(); 
+    });
+
+    function initializeGame() {
+        savedData = loadGameData();
+        resetState();
+        resizeCanvas();
+        startMenuAnimation();
+        setupAudio();
+        resetStartScreenForDisplay();
+        checkOrientation();
+        dom.startButton.disabled = false;
+        dom.startButton.textContent = "Oyuna Başla";
+    }
+
+    dom.startButton.disabled = true;
+    dom.startButton.textContent = "Yükleniyor...";
+    
+    loadAssets()
+        .then(initializeGame)
+        .catch(error => {
+            console.error("Resimler yüklenirken bir hata oluştu:", error);
+            dom.startButton.textContent = "Hata! Yenile.";
+        });
+});
+</script>
+</body>
+</html>
